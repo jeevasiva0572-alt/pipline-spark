@@ -8,6 +8,17 @@ project_root = Path(__file__).resolve().parent
 if str(project_root) not in sys.path:
     sys.path.append(str(project_root))
 
+# ✅ Set JAVA_HOME for Railway (Nix-based Java path)
+if not os.environ.get("JAVA_HOME"):
+    import subprocess, shutil
+    java_path = shutil.which("java")
+    if java_path:
+        # Resolve symlinks to find the real JDK root
+        real = os.path.realpath(java_path)
+        java_home = os.path.dirname(os.path.dirname(real))
+        os.environ["JAVA_HOME"] = java_home
+        print(f"☕ JAVA_HOME set to: {java_home}")
+
 from datetime import datetime
 from pyspark.sql import SparkSession
 from app.db.connection import get_db_connection

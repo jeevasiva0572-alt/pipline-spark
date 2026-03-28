@@ -4,6 +4,14 @@ import sys
 # ✅ Add project root to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+# ✅ Set JAVA_HOME for Railway (Nix-based Java path)
+if not os.environ.get("JAVA_HOME"):
+    import shutil
+    java_path = shutil.which("java")
+    if java_path:
+        real = os.path.realpath(java_path)
+        os.environ["JAVA_HOME"] = os.path.dirname(os.path.dirname(real))
+
 from flask import Flask, jsonify
 from app.pipeline.runner import run_pipeline_for_api, run_pipeline_for_file
 from app.db.connection import get_db_connection
