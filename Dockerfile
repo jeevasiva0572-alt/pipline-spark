@@ -1,12 +1,16 @@
-# Use Python 3.11 slim (Debian-based)
-FROM python:3.11-slim
+# Use full Python Bookworm to ensure package availability
+FROM python:3.11-bookworm
 
-# Install OpenJDK 17 (required for PySpark)
+# Install OpenJDK 17 (standard in Debian Bookworm)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends openjdk-17-jdk-headless procps && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get install -y --no-install-recommends \
+    openjdk-17-jdk-headless \
+    procps \
+    ca-certificates \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Set JAVA_HOME (Debian standard path)
+# Set JAVA_HOME
 ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 ENV PATH="$JAVA_HOME/bin:$PATH"
 
