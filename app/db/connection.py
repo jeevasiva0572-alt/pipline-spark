@@ -37,16 +37,24 @@ if _ssl_ca:
 # =========================================
 # CONNECTION FUNCTION
 # =========================================
-_db_connected_logged = False  # Print success message only once per process
-
 def get_db_connection():
     global _db_connected_logged
+    
+    # Check for missing config (Railway dashboard issue)
+    if not DB_CONFIG["host"]:
+        print("❌ CRITICAL: DB_HOST environment variable is missing!")
+        return None
+        
     try:
+        # Debug: show what we are trying to connect to
+        if not _db_connected_logged:
+            print(f"📡 Attempting to connect to DB: {DB_CONFIG['host']}")
+            
         conn = mysql.connector.connect(**DB_CONFIG)
         if not _db_connected_logged:
             print("✅ DB Connected Successfully")
             _db_connected_logged = True
         return conn
     except Exception as e:
-        print(f"❌ Database connection failed: {e}")
+        print(f"❌ Database connection failed at {DB_CONFIG['host']}: {e}")
         return None
