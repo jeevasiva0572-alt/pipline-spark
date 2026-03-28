@@ -8,6 +8,17 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # =========================================
+# SSL CERT — resolve relative to this file
+# Works on local Windows & Railway Linux
+# =========================================
+_APP_DIR = os.path.dirname(os.path.abspath(__file__))
+_DEFAULT_SSL = os.path.join(_APP_DIR, "..", "global-bundle.pem")
+
+_ssl_ca = os.getenv("SSL_CA")
+if not _ssl_ca or not os.path.exists(_ssl_ca):
+    _ssl_ca = _DEFAULT_SSL if os.path.exists(_DEFAULT_SSL) else None
+
+# =========================================
 # DB CONFIG FROM ENV
 # =========================================
 DB_CONFIG = {
@@ -17,8 +28,11 @@ DB_CONFIG = {
     "password": os.getenv("DB_PASSWORD"),
     "database": os.getenv("DB_NAME"),
     "autocommit": True,
-    "ssl_ca": os.getenv("SSL_CA")  # path to SSL cert
 }
+
+# Only add ssl_ca if the cert file exists
+if _ssl_ca:
+    DB_CONFIG["ssl_ca"] = _ssl_ca
 
 # =========================================
 # CONNECTION FUNCTION

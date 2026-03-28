@@ -7,30 +7,31 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from flask import Flask, jsonify
 from app.pipeline.runner import run_pipeline_for_api, run_pipeline_for_file
 from app.db.connection import get_db_connection
-from pyspark.sql import SparkSession
 from datetime import datetime
 
 app = Flask(__name__)
 
-# ✅ Initialize Spark (light config)
-def initialize_spark():
-    spark = SparkSession.builder \
-        .appName("PipelineAPI") \
-        .config("spark.driver.memory", "1g") \
-        .config("spark.executor.memory", "1g") \
-        .getOrCreate()
+# ✅ Lazy Spark init — only created when a route actually needs it
+_spark = None
 
-    spark.sparkContext.setLogLevel("WARN")
-    return spark
-
-spark = initialize_spark()
+def get_spark():
+    global _spark
+    if _spark is None:
+        from pyspark.sql import SparkSession
+        _spark = SparkSession.builder \
+            .appName("PipelineAPI") \
+            .config("spark.driver.memory", "1g") \
+            .config("spark.executor.memory", "1g") \
+            .getOrCreate()
+        _spark.sparkContext.setLogLevel("WARN")
+    return _spark
 
 # -------------------------------
-# Home route
+# Health check route
 # -------------------------------
 @app.route("/")
 def home():
-    return "🚀 Flask + Spark API Running"
+    return "🚀 Flask + Spark Pipeline Running"
 
 # -------------------------------
 # API trigger route
@@ -59,7 +60,7 @@ def run_file():
         cursor.execute("UPDATE files SET status='PROCESSING' WHERE id=%s", (file_id,))
         db.commit()
 
-        run_pipeline_for_file(spark, file_record)
+        run_pipeline_for_file(get_spark(), file_record)
 
         cursor.execute("UPDATE files SET status='DONE' WHERE id=%s", (file_id,))
         db.commit()
@@ -99,7 +100,7 @@ def run_api():
         cursor.execute("UPDATE api_data SET status='PROCESSING' WHERE id=%s", (api_id,))
         db.commit()
 
-        run_pipeline_for_api(spark, record)
+        run_pipeline_for_api(get_spark(), record)
 
         cursor.execute("UPDATE api_data SET status='DONE' WHERE id=%s", (api_id,))
         db.commit()
@@ -116,4 +117,5 @@ def run_api():
 # Run server
 # -------------------------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)

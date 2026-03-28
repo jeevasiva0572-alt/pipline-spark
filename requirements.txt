@@ -1,0 +1,7 @@
+flask
+gunicorn
+pyspark
+mysql-connector-python
+python-dotenv
+pandas
+pyarrow
