@@ -37,9 +37,10 @@ def initialize_spark():
         .config("spark.executor.memory", "1g") \
         .config("spark.sql.execution.arrow.pyspark.enabled", "true") \
         .config("spark.sql.legacy.timeParserPolicy", "LEGACY") \
+        .config("spark.ui.showConsoleProgress", "false") \
         .getOrCreate()
 
-    spark.sparkContext.setLogLevel("WARN")
+    spark.sparkContext.setLogLevel("ERROR")
     return spark
 
 

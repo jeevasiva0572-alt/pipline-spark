@@ -30,8 +30,9 @@ def get_spark():
             .appName("PipelineAPI") \
             .config("spark.driver.memory", "1g") \
             .config("spark.executor.memory", "1g") \
+            .config("spark.ui.showConsoleProgress", "false") \
             .getOrCreate()
-        _spark.sparkContext.setLogLevel("WARN")
+        _spark.sparkContext.setLogLevel("ERROR")
     return _spark
 
 # -------------------------------
