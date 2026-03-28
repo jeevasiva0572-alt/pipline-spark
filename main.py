@@ -1,8 +1,8 @@
 import os
 import sys
 
-# ✅ Add project root to sys.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# ✅ Add project root to sys.path (needed if this file was moved)
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 
 # ✅ Set JAVA_HOME for Railway (Nix-based Java path)
 if not os.environ.get("JAVA_HOME"):

@@ -26,4 +26,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Default: start the web server (Railway overrides this per service via Procfile)
-CMD gunicorn app.main:app --bind 0.0.0.0:$PORT --timeout 120
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--pythonpath", ".", "main:app"]
