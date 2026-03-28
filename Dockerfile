@@ -1,16 +1,16 @@
-# Use a STABLE version of Debian (Bullseye) to avoid "trixie" repository issues
-FROM python:3.11-bullseye
+# Use Debian Bookworm (Stable) for reliable Java 17 access
+FROM python:3.11-slim-bookworm
 
-# Install Java (OpenJDK 11 is the rock-solid default for Spark on Bullseye)
+# Install Java 17 (Required by modern PySpark)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    openjdk-11-jdk-headless \
+    openjdk-17-jre-headless \
     procps \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Set JAVA_HOME for Bullseye + OpenJDK 11
-ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+# Set JAVA_HOME for Bookworm + Java 17
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 ENV PATH="$JAVA_HOME/bin:$PATH"
 
 # Set PYTHONPATH to the project root
