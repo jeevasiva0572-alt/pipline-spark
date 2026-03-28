@@ -1,0 +1,43 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Environment variables
+.env
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# PySpark temp
+spark-warehouse/
+metastore_db/
+
+# Data files (optional - if large)
+*.csv
+*.parquet
+
+# Uploads (if dynamic)
+uploads/
+processed/
+
+# Build files
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
