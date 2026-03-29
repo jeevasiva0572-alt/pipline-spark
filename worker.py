@@ -26,7 +26,7 @@ from app.pipeline.runner import run_pipeline_for_api, run_pipeline_for_file, CHE
 
 # ⏰ FILES batch time
 FILES_BATCH_HOUR = 16
-FILES_BATCH_MINUTE = 4
+FILES_BATCH_MINUTE = 10
 
 
 # ✅ Spark init (LOW MEMORY for Railway)

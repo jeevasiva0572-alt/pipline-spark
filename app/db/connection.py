@@ -8,15 +8,19 @@ from dotenv import load_dotenv
 # load_dotenv()  # Disabled - using hardcoded values
 
 # =========================================
+# STATE FLAGS
+# =========================================
+_db_connected_logged = False
+
+# =========================================
 # SSL CERT — resolve relative to this file
 # Works on local Windows & Railway Linux
 # =========================================
 _APP_DIR = os.path.dirname(os.path.abspath(__file__))
 _DEFAULT_SSL = os.path.join(_APP_DIR, "..", "global-bundle.pem")
 
-_ssl_ca = "./global-bundle.pem"
-if not _ssl_ca or not os.path.exists(_ssl_ca):
-    _ssl_ca = _DEFAULT_SSL if os.path.exists(_DEFAULT_SSL) else None
+# Hardcode to look in the app/ dir where it exists
+_ssl_ca = _DEFAULT_SSL if os.path.exists(_DEFAULT_SSL) else "./global-bundle.pem"
 
 # =========================================
 # DB CONFIG - HARDCODED VALUES
