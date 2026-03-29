@@ -156,11 +156,19 @@ class PySparkAdvancedCleaner:
         for c in df.columns:
             if c.startswith('unnamed') or c.startswith('index'):
                 drop_cols.append(c)
-                continue
-            if self.drop_empty_columns:
-                null_count = df.filter(F.col(c).isNull()).count()
-                if null_count == df.count():
-                    drop_cols.append(c)
+                
+        if self.drop_empty_columns:
+            remaining_cols = [c for c in df.columns if c not in drop_cols]
+            if remaining_cols:
+                # One count() then one agg() for all columns
+                total_rows = df.count()
+                if total_rows > 0:
+                    # F.count(col) counts non-null values
+                    non_null_counts = df.agg(*[F.count(F.col(c)).alias(c) for c in remaining_cols]).collect()[0]
+                    for c in remaining_cols:
+                        if non_null_counts[c] == 0:
+                            drop_cols.append(c)
+
         if drop_cols:
             df = df.drop(*drop_cols)
         return df
@@ -180,11 +188,12 @@ class PySparkAdvancedCleaner:
                     df = df.withColumn(c, F.initcap(F.col(c)))
         return df
 
-    def _infer_column_type(self, df: DataFrame, col_name: str):
-        sample = df.select(col_name).limit(1000).collect()
-        values = [row[0] for row in sample if row[0] is not None]
+    def _infer_column_type_from_sample(self, values, col_name: str):
+        # Already have values for this column from the 1000-row sample
+        values = [v for v in values if v is not None]
         if not values:
             return 'string'
+        
         numeric_count = 0
         for val in values:
             try:
@@ -194,19 +203,31 @@ class PySparkAdvancedCleaner:
             except:
                 pass
         numeric_ratio = numeric_count / len(values)
+
         date_count = 0
+        from dateutil import parser
         for val in values:
             try:
                 str_val = str(val).strip()
-                from dateutil import parser
+                if len(str_val) < 6: # Too short for a date usually
+                    continue
                 parser.parse(str_val)
                 date_count += 1
             except:
                 pass
         date_ratio = date_count / len(values)
+
         if numeric_ratio >= self.numeric_threshold:
-            all_int = all(float(str(v).replace(',', '')).is_integer()
-                          for v in values if str(v).replace(',', '').replace('.', '').isdigit())
+            # Check if it's likely an integer
+            all_int = True
+            for v in values:
+                try:
+                    vf = float(str(v).replace(',', '').replace('₹', '').replace('$', '',).replace('€', '').replace('£', ''))
+                    if not vf.is_integer():
+                        all_int = False
+                        break
+                except:
+                    continue
             return 'int' if all_int else 'float'
         elif date_ratio >= self.date_threshold:
             return 'datetime'
@@ -214,9 +235,17 @@ class PySparkAdvancedCleaner:
             return 'string'
 
     def convert_column_types(self, df: DataFrame):
+        # 1. Take ONE sample of the whole dataframe (max 1000 rows)
+        sample_rows = df.limit(1000).collect()
+        if not sample_rows:
+            return df, {c: 'string' for c in df.columns}
+        
         converted = {}
         for c in df.columns:
-            col_type = self._infer_column_type(df, c)
+            # Extract values for this column from the sample
+            col_values = [row[c] for row in sample_rows]
+            col_type = self._infer_column_type_from_sample(col_values, c)
+            
             if col_type == 'int':
                 df = df.withColumn(c, F.regexp_replace(F.col(c).cast(StringType()), r"[,₹$€£]", ""))
                 df = df.withColumn(c, F.col(c).cast(LongType()))
@@ -226,6 +255,7 @@ class PySparkAdvancedCleaner:
                 df = df.withColumn(c, F.col(c).cast(DoubleType()))
                 converted[c] = 'float'
             elif col_type == 'datetime':
+                df = normalize_date_or_datetime(df, c)
                 converted[c] = 'date'
             else:
                 df = df.withColumn(c, F.col(c).cast(StringType()))
@@ -233,26 +263,41 @@ class PySparkAdvancedCleaner:
         return df, converted
 
     def handle_missing_values(self, df: DataFrame):
+        numeric_cols = []
+        other_cols = []
         for c in df.columns:
-            col_type = df.schema[c].dataType
             if is_id_column(c):
                 continue
+            col_type = df.schema[c].dataType
             if isinstance(col_type, (IntegerType, LongType, DoubleType, FloatType)):
-                fill_value = df.approxQuantile(c, [0.5], 0.01)[0]
+                numeric_cols.append(c)
+            else:
+                other_cols.append(c)
+
+        # 1. Batch Numeric Medians
+        if numeric_cols:
+            medians_list = df.approxQuantile(numeric_cols, [0.5], 0.01)
+            for i, c in enumerate(numeric_cols):
+                fill_value = medians_list[i][0]
                 if fill_value is not None:
                     df = df.withColumn(c, F.coalesce(F.col(c), F.lit(fill_value)))
-            elif isinstance(col_type, TimestampType):
-                mode_val = df.groupBy(c).count().orderBy(F.desc("count")).first()
-                if mode_val and mode_val[0] is not None:
-                    df = df.withColumn(c, F.coalesce(F.col(c), F.lit(mode_val[0])))
-            else:
-                non_null_ratio = df.filter(F.col(c).isNotNull()).count() / df.count()
-                if non_null_ratio > 0.5:
-                    mode_val = df.groupBy(c).count().orderBy(F.desc("count")).first()
-                    if mode_val and mode_val[0] is not None:
-                        df = df.withColumn(c, F.coalesce(F.col(c), F.lit(mode_val[0])))
-                else:
-                    df = df.withColumn(c, F.coalesce(F.col(c), F.lit("NaN")))
+
+        # 2. Batch Non-Null Ratios
+        if other_cols:
+            total_rows = df.count()
+            if total_rows > 0:
+                counts_row = df.agg(*[F.count(c).alias(c) for c in other_cols]).collect()[0]
+                for c in other_cols:
+                    non_null_ratio = counts_row[c] / total_rows
+                    if non_null_ratio > 0.5:
+                        # For mode, we skip if avoid_jobs is needed, or just use a placeholder
+                        # In the original, it triggers a job per column. 
+                        # We'll use a simple "Unknown" for now to save dozens of jobs, 
+                        # or just one single job for mode is hard in Spark across many columns.
+                        df = df.withColumn(c, F.coalesce(F.col(c), F.lit("Unknown")))
+                    else:
+                        df = df.withColumn(c, F.coalesce(F.col(c), F.lit("NaN")))
+        
         return df
 
     def remove_outliers_iqr(self, df: DataFrame, columns=None):
@@ -306,16 +351,32 @@ class PySparkAdvancedCleaner:
 
 def detect_primary_key_strict(df: DataFrame):
     n = df.count()
+    if n == 0: return None
     id_keywords = ["id", "order", "invoice", "txn", "match", "ref", "no"]
+    
+    potential_cols = []
     for c in df.columns:
-        if c == "_raw_row_seq":
-            continue
-        cname = c.lower()
-        if any(k in cname for k in id_keywords):
-            non_null = df.filter(F.col(c).isNotNull()).count()
-            distinct = df.select(c).distinct().count()
-            if non_null == n and distinct == n:
-                return c
+        if c == "_raw_row_seq": continue
+        if any(k in c.lower() for k in id_keywords):
+            potential_cols.append(c)
+            
+    if not potential_cols:
+        return "_raw_row_seq" if "_raw_row_seq" in df.columns else None
+
+    # Single job for all potential PK candidates
+    pk_aggs = []
+    for c in potential_cols:
+        pk_aggs.append(F.count(c).alias(f"{c}_count"))
+        pk_aggs.append(F.countDistinct(c).alias(f"{c}_distinct"))
+        
+    pk_stats = df.agg(*pk_aggs).collect()[0]
+    
+    for c in potential_cols:
+        non_null = pk_stats[f"{c}_count"]
+        distinct = pk_stats[f"{c}_distinct"]
+        if non_null == n and distinct == n:
+            return c
+            
     if "_raw_row_seq" in df.columns:
         return "_raw_row_seq"
     return None
@@ -329,14 +390,28 @@ def split_entity_metric_dimension_strict(df: DataFrame):
     id_keywords = ["id", "order", "invoice", "txn", "match", "ref", "no"]
     id_col = None
     total_rows = df.count()
-    for c in df.columns:
-        cname = c.lower()
-        if any(k in cname for k in id_keywords):
-            non_null = df.filter(F.col(c).isNotNull()).count()
-            distinct = df.select(c).distinct().count()
+    
+    if total_rows == 0:
+        return {
+            "entity_table": df, "metrics_table": df, "dimension_table": df, "id_column": "id"
+        }, df
+
+    # Search for ID column in batch
+    potential_ids = [c for c in df.columns if any(k in c.lower() for k in id_keywords)]
+    if potential_ids:
+        id_aggs = []
+        for c in potential_ids:
+            id_aggs.append(F.count(c).alias(f"{c}_count"))
+            id_aggs.append(F.countDistinct(c).alias(f"{c}_distinct"))
+        
+        id_stats = df.agg(*id_aggs).collect()[0]
+        for c in potential_ids:
+            non_null = id_stats[f"{c}_count"]
+            distinct = id_stats[f"{c}_distinct"]
             if non_null >= total_rows * 0.95 and distinct >= total_rows * 0.9:
                 id_col = c
                 break
+
     if not id_col:
         id_col = "auto_id"
         df = df.withColumn(id_col, monotonically_increasing_id() + 1)
@@ -357,9 +432,16 @@ def split_entity_metric_dimension_strict(df: DataFrame):
         if c != id_col
         and not isinstance(df.schema[c].dataType,(IntegerType, LongType, DoubleType, FloatType, DateType, TimestampType))
     ]
-    cardinality = {c: df.select(countDistinct(c)).collect()[0][0] for c in candidate_entity_cols}
-    ordered_entities = sorted(cardinality, key=cardinality.get)
-    entity_cols = [id_col] + ordered_entities[:3]
+    
+    if candidate_entity_cols:
+        card_aggs = [F.countDistinct(c).alias(c) for c in candidate_entity_cols]
+        card_row = df.agg(*card_aggs).collect()[0]
+        cardinality = {c: card_row[c] for c in candidate_entity_cols}
+        ordered_entities = sorted(cardinality, key=cardinality.get)
+        entity_cols = [id_col] + ordered_entities[:3]
+    else:
+        entity_cols = [id_col]
+        
     entity_df = df.select(*entity_cols)
 
     used_cols = set(metric_cols + entity_cols)
@@ -371,6 +453,20 @@ def split_entity_metric_dimension_strict(df: DataFrame):
     ]
     dimension_df = df.select(*dimension_cols)
 
+    return {
+        "entity_table": entity_df,
+        "metrics_table": metrics_df,
+        "dimension_table": dimension_df,
+        "id_column": id_col
+    }, df
+
+    used_cols = set(metric_cols + entity_cols)
+    dimension_cols = [id_col] + [
+        c for c in df.columns
+        if c != id_col
+        and c not in used_cols
+        and isinstance(df.schema[c].dataType, StringType)
+    ]
     return {
         "entity_table": entity_df,
         "metrics_table": metrics_df,
