@@ -8,16 +8,20 @@ project_root = Path(__file__).resolve().parent
 if str(project_root) not in sys.path:
     sys.path.append(str(project_root))
 
-# ✅ Set JAVA_HOME for Railway (Nix-based Java path)
+# ✅ Set JAVA_HOME for Railway / Local
 if not os.environ.get("JAVA_HOME"):
-    import subprocess, shutil
+    import shutil
     java_path = shutil.which("java")
     if java_path:
-        # Resolve symlinks to find the real JDK root
         real = os.path.realpath(java_path)
         java_home = os.path.dirname(os.path.dirname(real))
         os.environ["JAVA_HOME"] = java_home
-        print(f"☕ JAVA_HOME set to: {java_home}")
+        print(f"☕ JAVA_HOME set to: {java_home}", flush=True)
+
+# 🤫 Suppress Java 17+ incubator warnings
+os.environ["_JAVA_OPTIONS"] = os.environ.get("_JAVA_OPTIONS", "") + " --add-opens=java.base/java.lang=ALL-UNNAMED"
+os.environ["PYSPARK_PYTHON"] = sys.executable
+os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
 
 from datetime import datetime
 from pyspark.sql import SparkSession
@@ -26,11 +30,11 @@ from app.pipeline.runner import run_pipeline_for_api, run_pipeline_for_file, CHE
 
 # ⏰ FILES batch time
 FILES_BATCH_HOUR = 16
-FILES_BATCH_MINUTE = 10
+FILES_BATCH_MINUTE = 25
 
 
-# ✅ Spark init (LOW MEMORY for Railway)
 def initialize_spark():
+    # 🤫 Shhh... suppress Hadoop & Incubator warnings
     spark = SparkSession.builder \
         .appName("UniversalDataCleaningPipeline") \
         .config("spark.driver.memory", "1g") \
@@ -38,6 +42,7 @@ def initialize_spark():
         .config("spark.sql.execution.arrow.pyspark.enabled", "true") \
         .config("spark.sql.legacy.timeParserPolicy", "LEGACY") \
         .config("spark.ui.showConsoleProgress", "false") \
+        .config("spark.driver.extraJavaOptions", "-Dlog4j.configuration=log4j2.properties -Dspark.ui.showConsoleProgress=false") \
         .getOrCreate()
 
     spark.sparkContext.setLogLevel("ERROR")
@@ -45,17 +50,17 @@ def initialize_spark():
 
 
 def main():
-    print("🚀 WORKER STARTED")
-    print("⚡ API → realtime | 📦 FILE → scheduled\n")
+    print("🚀 WORKER STARTED", flush=True)
+    print("⚡ API → realtime | 📦 FILE → scheduled\n", flush=True)
 
     spark = initialize_spark()
 
     # ✅ Spark test
     try:
-        print("🧪 Testing Spark...")
-        print("✅ Spark working:", spark.range(5).collect())
+        print("🧪 Testing Spark...", flush=True)
+        print("✅ Spark working:", spark.range(5).collect(), flush=True)
     except Exception as e:
-        print("❌ Spark failed:", e)
+        print("❌ Spark failed:", e, flush=True)
         return
 
     last_file_batch_date = None
@@ -120,12 +125,14 @@ def main():
             # ==================================
             # 📦 FILES (SCHEDULED)
             # ==================================
+            # Target scheduled time today
+            sched_time = now.replace(hour=FILES_BATCH_HOUR, minute=FILES_BATCH_MINUTE, second=0, microsecond=0)
+
             if (
-                now.hour == FILES_BATCH_HOUR and
-                now.minute == FILES_BATCH_MINUTE and
+                now >= sched_time and
                 last_file_batch_date != now.date()
             ):
-                print("🕛 FILE BATCH STARTED")
+                print(f"🕛 FILE BATCH STARTED (Target: {FILES_BATCH_HOUR}:{FILES_BATCH_MINUTE:02})", flush=True)
 
                 try:
                     cursor.execute("""
@@ -136,6 +143,7 @@ def main():
                     """)
 
                     files = cursor.fetchall()
+                    print(f"📦 Found {len(files)} new files to process", flush=True)
 
                     for file_record in files:
                         file_id = file_record["id"]
