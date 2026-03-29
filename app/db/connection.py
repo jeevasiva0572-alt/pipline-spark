@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 # =========================================
 # LOAD ENV VARIABLES
 # =========================================
-load_dotenv()
+# load_dotenv()  # Disabled - using hardcoded values
 
 # =========================================
 # SSL CERT — resolve relative to this file
@@ -14,19 +14,19 @@ load_dotenv()
 _APP_DIR = os.path.dirname(os.path.abspath(__file__))
 _DEFAULT_SSL = os.path.join(_APP_DIR, "..", "global-bundle.pem")
 
-_ssl_ca = os.getenv("SSL_CA")
+_ssl_ca = "./global-bundle.pem"
 if not _ssl_ca or not os.path.exists(_ssl_ca):
     _ssl_ca = _DEFAULT_SSL if os.path.exists(_DEFAULT_SSL) else None
 
 # =========================================
-# DB CONFIG FROM ENV
+# DB CONFIG - HARDCODED VALUES
 # =========================================
 DB_CONFIG = {
-    "host": os.getenv("DB_HOST"),
-    "port": int(os.getenv("DB_PORT", 3306)),
-    "user": os.getenv("DB_USER"),
-    "password": os.getenv("DB_PASSWORD"),
-    "database": os.getenv("DB_NAME"),
+    "host": "cloud360-db.czz9oknmols5.us-east-1.rds.amazonaws.com",
+    "port": 3306,
+    "user": "cloud360_main",
+    "password": "12345678",
+    "database": "file_upload_db",
     "autocommit": True,
 }
 

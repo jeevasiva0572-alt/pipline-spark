@@ -15,12 +15,8 @@ from dotenv import load_dotenv
 # =========================================
 # CONFIG
 # =========================================
-load_dotenv()
-
-# On Railway: no local disk — use /tmp for any file output
-# On local: uses BASE_UPLOAD_DIR from .env
-_DEFAULT_UPLOAD_DIR = "/tmp/pipeline_uploads"
-BASE_UPLOAD_DIR = os.getenv("BASE_UPLOAD_DIR") or _DEFAULT_UPLOAD_DIR
+# BASE_UPLOAD_DIR = os.getenv("BASE_UPLOAD_DIR") or _DEFAULT_UPLOAD_DIR
+BASE_UPLOAD_DIR = r"D:\cloud360\File_upload-Backend"
 UPLOADS_DIR = os.path.join(BASE_UPLOAD_DIR, "uploads")
 PROCESSED_DIR = os.path.join(BASE_UPLOAD_DIR, "uploads", "processed")
 CHECK_INTERVAL = 1
