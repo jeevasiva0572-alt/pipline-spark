@@ -25,8 +25,8 @@ from app.db.connection import get_db_connection
 from app.pipeline.runner import run_pipeline_for_api, run_pipeline_for_file, CHECK_INTERVAL
 
 # ⏰ FILES batch time
-FILES_BATCH_HOUR = 15
-FILES_BATCH_MINUTE = 52
+FILES_BATCH_HOUR = 16
+FILES_BATCH_MINUTE = 4
 
 
 # ✅ Spark init (LOW MEMORY for Railway)
