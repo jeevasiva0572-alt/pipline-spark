@@ -30,7 +30,7 @@ from app.pipeline.runner import run_pipeline_for_api, run_pipeline_for_file, CHE
 
 # ⏰ FILES batch time
 FILES_BATCH_HOUR = 15
-FILES_BATCH_MINUTE = 20
+FILES_BATCH_MINUTE = 30
 
 
 def initialize_spark():
