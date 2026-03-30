@@ -29,7 +29,7 @@ from app.db.connection import get_db_connection
 from app.pipeline.runner import run_pipeline_for_api, run_pipeline_for_file, CHECK_INTERVAL
 
 # ⏰ FILES batch time
-FILES_BATCH_HOUR = 21
+FILES_BATCH_HOUR = 11
 FILES_BATCH_MINUTE = 40
 
 
