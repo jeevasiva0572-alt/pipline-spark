@@ -31,6 +31,7 @@ def get_spark():
             .config("spark.driver.memory", "1g") \
             .config("spark.executor.memory", "1g") \
             .config("spark.ui.showConsoleProgress", "false") \
+            .config("spark.driver.extraJavaOptions", "-Dlog4j2.configurationFile=log4j2.properties -Dspark.ui.showConsoleProgress=false") \
             .getOrCreate()
         _spark.sparkContext.setLogLevel("ERROR")
     return _spark

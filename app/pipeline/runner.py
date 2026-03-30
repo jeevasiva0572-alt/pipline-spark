@@ -15,10 +15,19 @@ from dotenv import load_dotenv
 # =========================================
 # CONFIG
 # =========================================
-# BASE_UPLOAD_DIR = os.getenv("BASE_UPLOAD_DIR") or _DEFAULT_UPLOAD_DIR
-BASE_UPLOAD_DIR = r"D:\cloud360\File_upload-Backend"
-UPLOADS_DIR = os.path.join(BASE_UPLOAD_DIR, "uploads")
-PROCESSED_DIR = os.path.join(BASE_UPLOAD_DIR, "uploads", "processed")
+# Support Railway Linux deployments or local Windows dev environments
+_RAILWAY_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "uploads")
+_LOCAL_BACKEND_DIR = r"D:\cloud360\File_upload-Backend"
+
+if os.path.exists(os.path.join(_LOCAL_BACKEND_DIR, "uploads")):
+    _DEFAULT_UPLOAD_DIR = _LOCAL_BACKEND_DIR
+else:
+    _DEFAULT_UPLOAD_DIR = _RAILWAY_DIR
+
+BASE_UPLOAD_DIR = os.getenv("BASE_UPLOAD_DIR", _DEFAULT_UPLOAD_DIR)
+UPLOADS_DIR = BASE_UPLOAD_DIR
+PROCESSED_DIR = os.path.join(BASE_UPLOAD_DIR, "processed")
+
 CHECK_INTERVAL = 1
 
 # -----------------------------------------

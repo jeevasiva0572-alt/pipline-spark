@@ -29,8 +29,8 @@ from app.db.connection import get_db_connection
 from app.pipeline.runner import run_pipeline_for_api, run_pipeline_for_file, CHECK_INTERVAL
 
 # ⏰ FILES batch time
-FILES_BATCH_HOUR = 14
-FILES_BATCH_MINUTE = 43
+FILES_BATCH_HOUR = 15
+FILES_BATCH_MINUTE = 20
 
 
 def initialize_spark():
@@ -42,7 +42,7 @@ def initialize_spark():
         .config("spark.sql.execution.arrow.pyspark.enabled", "true") \
         .config("spark.sql.legacy.timeParserPolicy", "LEGACY") \
         .config("spark.ui.showConsoleProgress", "false") \
-        .config("spark.driver.extraJavaOptions", "-Dlog4j.configuration=log4j2.properties -Dspark.ui.showConsoleProgress=false") \
+        .config("spark.driver.extraJavaOptions", "-Dlog4j2.configurationFile=log4j2.properties -Dspark.ui.showConsoleProgress=false") \
         .getOrCreate()
 
     spark.sparkContext.setLogLevel("ERROR")
